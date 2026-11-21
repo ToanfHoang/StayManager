@@ -1,0 +1,71 @@
+{
+  "name": "staymanager-desktop",
+  "productName": "StayManager",
+  "version": "1.0.0",
+  "description": "StayManager – Quản lý nhà trọ (bản cài trên máy tính)",
+  "author": "StayManager",
+  "private": true,
+  "main": "main.js",
+  "scripts": {
+    "stage": "node scripts/stage.mjs",
+    "start": "electron .",
+    "dist": "node scripts/stage.mjs && electron-builder --win --x64"
+  },
+  "build": {
+    "appId": "vn.staymanager.desktop",
+    "productName": "StayManager",
+    "copyright": "StayManager",
+    "asar": false,
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "package.json",
+      "icon.png"
+    ],
+    "extraResources": [
+      {
+        "from": "server",
+        "to": "server",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico",
+      "artifactName": "StayManager-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": "always",
+      "createStartMenuShortcut": true,
+      "shortcutName": "StayManager",
+      "uninstallDisplayName": "StayManager – Quản lý nhà trọ",
+      "deleteAppDataOnUninstall": false,
+      "installerLanguages": [
+        "vi_VN"
+      ],
+      "language": "1066"
+    }
+  },
+  "devDependencies": {
+    "electron": "^45.4.1",
+    "electron-builder": "^26.18.0"
+  },
+  "allowScripts": {
+    "electron@45.4.1": true
+  }
+}

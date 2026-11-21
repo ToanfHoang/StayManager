@@ -1,0 +1,574 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  LANDLORD
+  STAFF
+  TENANT
+}
+
+enum RoomStatus {
+  AVAILABLE
+  OCCUPIED
+  MAINTENANCE
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum ContractStatus {
+  ACTIVE
+  EXPIRED
+  TERMINATED
+}
+
+enum ServiceType {
+  INTERNET
+  PARKING
+  CLEANING
+  OTHER
+}
+
+enum ServiceUnit {
+  PER_ROOM
+  PER_PERSON
+}
+
+/// OVERDUE: scheduler cập nhật khi còn nợ và đã quá hạn (đồng thời luôn được suy ra lại khi đọc)
+enum InvoiceStatus {
+  UNPAID
+  PARTIALLY_PAID
+  OVERDUE
+  PAID
+  CANCELLED
+}
+
+enum NotificationType {
+  INVOICE_CREATED
+  PAYMENT_REMINDER
+  INVOICE_OVERDUE
+  PAYMENT_VERIFIED
+  PAYMENT_REJECTED
+  PAYMENT_SUBMITTED
+  MAINTENANCE_REQUEST
+  MAINTENANCE_UPDATE
+  UNPAID_SUMMARY
+  CONTRACT_EXPIRING
+  ANNOUNCEMENT
+  BANK_TX_UNMATCHED
+  PAYMENT_AUTO_MATCHED
+}
+
+/// Cách tính tiền nước của khu trọ
+enum WaterMode {
+  /// Theo chỉ số đồng hồ nước từng phòng
+  METER
+  /// Nhập tổng tiền nước cả dãy khi lập hóa đơn, chia theo số người ở
+  SPLIT_PER_PERSON
+}
+
+enum InvoiceItemType {
+  RENT
+  ELECTRICITY
+  WATER
+  INTERNET
+  PARKING
+  CLEANING
+  OTHER
+}
+
+enum PaymentMethod {
+  CASH
+  BANK_TRANSFER
+  OTHER
+}
+
+enum EntryType {
+  INCOME
+  EXPENSE
+}
+
+enum MaintenancePriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum MaintenanceStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+model User {
+  id           Int      @id @default(autoincrement())
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  fullName     String   @map("full_name")
+  phone        String?
+  role         Role
+  landlordId   Int?     @map("landlord_id")
+  /// Tài khoản cổng người thuê liên kết với hồ sơ người thuê
+  tenantId     Int?     @unique @map("tenant_id")
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  landlord            User?                @relation("LandlordStaff", fields: [landlordId], references: [id], onDelete: Restrict)
+  staff               User[]               @relation("LandlordStaff")
+  properties          Property[]
+  tenants             Tenant[]
+  expenseCategories   ExpenseCategory[]
+  assignedMaintenance MaintenanceRequest[] @relation("AssignedStaff")
+  payments            Payment[]            @relation("PaymentCreator")
+  expenses            Expense[]            @relation("ExpenseCreator")
+  auditLogs           AuditLog[]
+  tenant              Tenant?              @relation("TenantPortalUser", fields: [tenantId], references: [id], onDelete: Restrict)
+  notifications       Notification[]
+  notificationLogs    NotificationLog[]
+  bankAccounts        BankAccount[]
+  hunonicAccount      HunonicAccount?
+
+  @@index([landlordId])
+  @@map("users")
+}
+
+model Property {
+  id               Int       @id @default(autoincrement())
+  ownerId          Int       @map("owner_id")
+  name             String
+  address          String
+  description      String?
+  floors           Int       @default(1)
+  contactName      String?   @map("contact_name")
+  contactPhone     String?   @map("contact_phone")
+  electricityPrice Decimal   @default(3500) @map("electricity_price")
+  waterPrice       Decimal   @default(20000) @map("water_price")
+  waterMode        WaterMode @default(METER) @map("water_mode")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  owner        User          @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  rooms        Room[]
+  services     Service[]
+  expenses     Expense[]
+  bankAccounts BankAccount[]
+
+  @@index([ownerId])
+  @@map("properties")
+}
+
+model Service {
+  id         Int         @id @default(autoincrement())
+  propertyId Int         @map("property_id")
+  name       String
+  type       ServiceType
+  unit       ServiceUnit @default(PER_ROOM)
+  price      Decimal
+  isActive   Boolean     @default(true) @map("is_active")
+  createdAt  DateTime    @default(now()) @map("created_at")
+  updatedAt  DateTime    @updatedAt @map("updated_at")
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@index([propertyId])
+  @@map("services")
+}
+
+model Room {
+  id            Int        @id @default(autoincrement())
+  propertyId    Int        @map("property_id")
+  roomNumber    String     @map("room_number")
+  floor         Int        @default(1)
+  area          Decimal?
+  price         Decimal
+  maxOccupancy  Int        @default(2) @map("max_occupancy")
+  description   String?
+  status        RoomStatus @default(AVAILABLE)
+  /// Công tơ điện Wi-Fi Hunonic gán cho phòng (root_id của thiết bị)
+  meterDeviceId String?    @map("meter_device_id")
+  meterName     String?    @map("meter_name")
+  createdAt     DateTime   @default(now()) @map("created_at")
+  updatedAt     DateTime   @updatedAt @map("updated_at")
+
+  property            Property             @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  images              RoomImage[]
+  contracts           Contract[]
+  meterReadings       MeterReading[]
+  invoices            Invoice[]
+  maintenanceRequests MaintenanceRequest[]
+
+  @@unique([propertyId, roomNumber])
+  @@index([status])
+  @@map("rooms")
+}
+
+model RoomImage {
+  id        Int      @id @default(autoincrement())
+  roomId    Int      @map("room_id")
+  url       String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@index([roomId])
+  @@map("room_images")
+}
+
+model Tenant {
+  id               Int       @id @default(autoincrement())
+  ownerId          Int       @map("owner_id")
+  fullName         String    @map("full_name")
+  phone            String
+  email            String?
+  idNumber         String?   @map("id_number")
+  dateOfBirth      DateTime? @map("date_of_birth")
+  gender           Gender?
+  permanentAddress String?   @map("permanent_address")
+  notes            String?
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  owner      User             @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  contracts  ContractTenant[]
+  portalUser User?            @relation("TenantPortalUser")
+
+  @@unique([ownerId, idNumber])
+  @@index([ownerId, fullName])
+  @@index([ownerId, phone])
+  @@map("tenants")
+}
+
+model Contract {
+  id             Int            @id @default(autoincrement())
+  contractNumber String         @unique @map("contract_number")
+  roomId         Int            @map("room_id")
+  startDate      DateTime       @map("start_date")
+  endDate        DateTime       @map("end_date")
+  rentPrice      Decimal        @map("rent_price")
+  deposit        Decimal        @default(0)
+  paymentDueDay  Int            @default(5) @map("payment_due_day")
+  status         ContractStatus @default(ACTIVE)
+  terms          String?
+  notes          String?
+  endedAt        DateTime?      @map("ended_at")
+  endReason      String?        @map("end_reason")
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  room     Room             @relation(fields: [roomId], references: [id], onDelete: Restrict)
+  tenants  ContractTenant[]
+  invoices Invoice[]
+
+  @@index([roomId, status])
+  @@index([status, endDate])
+  @@map("contracts")
+}
+
+model ContractTenant {
+  contractId Int       @map("contract_id")
+  tenantId   Int       @map("tenant_id")
+  isPrimary  Boolean   @default(false) @map("is_primary")
+  joinedAt   DateTime  @map("joined_at")
+  leftAt     DateTime? @map("left_at")
+
+  contract Contract @relation(fields: [contractId], references: [id], onDelete: Restrict)
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  @@id([contractId, tenantId])
+  @@index([tenantId])
+  @@map("contract_tenants")
+}
+
+model MeterReading {
+  id               Int      @id @default(autoincrement())
+  roomId           Int      @map("room_id")
+  period           String
+  electricityPrev  Decimal  @map("electricity_prev")
+  electricityCurr  Decimal  @map("electricity_curr")
+  electricityPrice Decimal  @map("electricity_price")
+  waterPrev        Decimal  @map("water_prev")
+  waterCurr        Decimal  @map("water_curr")
+  waterPrice       Decimal  @map("water_price")
+  readingDate      DateTime @map("reading_date")
+  note             String?
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  room Room @relation(fields: [roomId], references: [id], onDelete: Restrict)
+
+  @@unique([roomId, period])
+  @@index([period])
+  @@map("meter_readings")
+}
+
+model Invoice {
+  id               Int           @id @default(autoincrement())
+  invoiceNumber    String        @unique @map("invoice_number")
+  roomId           Int           @map("room_id")
+  contractId       Int           @map("contract_id")
+  period           String
+  /// = period khi hóa đơn còn hiệu lực, NULL khi đã hủy (chống trùng hóa đơn)
+  periodKey        String?       @map("period_key")
+  issueDate        DateTime      @map("issue_date")
+  dueDate          DateTime      @map("due_date")
+  totalAmount      Decimal       @map("total_amount")
+  paidAmount       Decimal       @default(0) @map("paid_amount")
+  status           InvoiceStatus @default(UNPAID)
+  note             String?
+  cancelledAt      DateTime?     @map("cancelled_at")
+  cancelReason     String?       @map("cancel_reason")
+  /// Nội dung chuyển khoản duy nhất, ví dụ STAY-P101-INV202611-8F31
+  paymentReference String?       @unique @map("payment_reference")
+  /// Lần gần nhất chủ trọ gửi hóa đơn cho người thuê qua Zalo
+  zaloSentAt       DateTime?     @map("zalo_sent_at")
+  createdAt        DateTime      @default(now()) @map("created_at")
+  updatedAt        DateTime      @updatedAt @map("updated_at")
+
+  room             Room              @relation(fields: [roomId], references: [id], onDelete: Restrict)
+  contract         Contract          @relation(fields: [contractId], references: [id], onDelete: Restrict)
+  items            InvoiceItem[]
+  payments         Payment[]
+  notificationLogs NotificationLog[]
+
+  @@unique([roomId, periodKey])
+  @@index([status, dueDate])
+  @@index([period])
+  @@map("invoices")
+}
+
+model InvoiceItem {
+  id          Int             @id @default(autoincrement())
+  invoiceId   Int             @map("invoice_id")
+  type        InvoiceItemType
+  description String
+  quantity    Decimal
+  unitPrice   Decimal         @map("unit_price")
+  amount      Decimal
+  sortOrder   Int             @default(0) @map("sort_order")
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+  @@map("invoice_details")
+}
+
+model Payment {
+  id            Int           @id @default(autoincrement())
+  receiptNumber String?       @unique @map("receipt_number")
+  invoiceId     Int           @map("invoice_id")
+  amount        Decimal
+  method        PaymentMethod
+  paymentDate   DateTime      @map("payment_date")
+  reference     String?
+  note          String?
+  createdById   Int?          @map("created_by")
+  voidedAt      DateTime?     @map("voided_at")
+  voidReason    String?       @map("void_reason")
+  /// MANUAL (chủ trọ ghi nhận) | SUBMISSION (xác nhận yêu cầu của người thuê) | WEBHOOK (cổng thanh toán – tương lai)
+  source        String        @default("MANUAL")
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+
+  invoice   Invoice @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+  createdBy User?   @relation("PaymentCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([invoiceId])
+  @@index([paymentDate])
+  @@map("payments")
+}
+
+model ExpenseCategory {
+  id        Int       @id @default(autoincrement())
+  /// NULL = danh mục mặc định của hệ thống
+  ownerId   Int?      @map("owner_id")
+  type      EntryType
+  name      String
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  owner    User?     @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  expenses Expense[]
+
+  @@unique([ownerId, type, name])
+  @@map("expense_categories")
+}
+
+model Expense {
+  id                   Int       @id @default(autoincrement())
+  propertyId           Int       @map("property_id")
+  categoryId           Int       @map("category_id")
+  type                 EntryType
+  amount               Decimal
+  entryDate            DateTime  @map("entry_date")
+  description          String
+  note                 String?
+  maintenanceRequestId Int?      @unique @map("maintenance_request_id")
+  createdById          Int?      @map("created_by")
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+
+  property           Property            @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  category           ExpenseCategory     @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  maintenanceRequest MaintenanceRequest? @relation(fields: [maintenanceRequestId], references: [id], onDelete: SetNull)
+  createdBy          User?               @relation("ExpenseCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([propertyId, entryDate])
+  @@index([type, entryDate])
+  @@map("expenses")
+}
+
+model MaintenanceRequest {
+  id            Int                 @id @default(autoincrement())
+  roomId        Int                 @map("room_id")
+  title         String
+  description   String?
+  priority      MaintenancePriority @default(MEDIUM)
+  requestDate   DateTime            @map("request_date")
+  status        MaintenanceStatus   @default(PENDING)
+  estimatedCost Decimal?            @map("estimated_cost")
+  actualCost    Decimal?            @map("actual_cost")
+  assignedToId  Int?                @map("assigned_to")
+  reportedBy    String?             @map("reported_by")
+  completedAt   DateTime?           @map("completed_at")
+  createdAt     DateTime            @default(now()) @map("created_at")
+  updatedAt     DateTime            @updatedAt @map("updated_at")
+
+  room       Room     @relation(fields: [roomId], references: [id], onDelete: Restrict)
+  assignedTo User?    @relation("AssignedStaff", fields: [assignedToId], references: [id], onDelete: SetNull)
+  expense    Expense?
+
+  @@index([status])
+  @@index([roomId])
+  @@map("maintenance_requests")
+}
+
+model AuditLog {
+  id        Int      @id @default(autoincrement())
+  userId    Int?     @map("user_id")
+  ownerId   Int?     @map("owner_id")
+  action    String
+  entity    String
+  entityId  Int?     @map("entity_id")
+  oldData   Json?    @map("old_data")
+  newData   Json?    @map("new_data")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([entity, entityId])
+  @@index([ownerId, createdAt])
+  @@map("audit_logs")
+}
+
+model BankAccount {
+  id            Int      @id @default(autoincrement())
+  landlordId    Int      @map("landlord_id")
+  /// NULL = tài khoản mặc định cho mọi khu trọ của chủ trọ
+  propertyId    Int?     @map("property_id")
+  /// Mã BIN ngân hàng (NAPAS, 6 chữ số) dùng cho VietQR
+  bankCode      String   @map("bank_code")
+  bankName      String   @map("bank_name")
+  accountNumber String   @map("account_number")
+  accountHolder String   @map("account_holder")
+  branch        String?
+  qrEnabled     Boolean  @default(true) @map("qr_enabled")
+  isActive      Boolean  @default(true) @map("is_active")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  landlord User      @relation(fields: [landlordId], references: [id], onDelete: Restrict)
+  property Property? @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@index([landlordId, propertyId])
+  @@map("bank_accounts")
+}
+
+model Notification {
+  id                Int              @id @default(autoincrement())
+  userId            Int              @map("user_id")
+  type              NotificationType
+  title             String
+  message           String
+  /// Đường dẫn trong ứng dụng khi bấm vào thông báo
+  link              String?
+  actionLabel       String?          @map("action_label")
+  relatedEntityType String?          @map("related_entity_type")
+  relatedEntityId   Int?             @map("related_entity_id")
+  isRead            Boolean          @default(false) @map("is_read")
+  readAt            DateTime?        @map("read_at")
+  createdAt         DateTime         @default(now()) @map("created_at")
+
+  user User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  log  NotificationLog?
+
+  @@index([userId, isRead, createdAt])
+  @@index([userId, type, createdAt])
+  @@map("notifications")
+}
+
+/// Nhật ký gửi thông báo – dedupe_key UNIQUE đảm bảo mỗi mốc chỉ gửi đúng 1 lần (idempotent)
+model NotificationLog {
+  id               Int      @id @default(autoincrement())
+  dedupeKey        String   @unique @map("dedupe_key")
+  invoiceId        Int?     @map("invoice_id")
+  userId           Int      @map("user_id")
+  notificationType String   @map("notification_type")
+  scheduledFor     DateTime @map("scheduled_for")
+  sentAt           DateTime @default(now()) @map("sent_at")
+  status           String   @default("SENT")
+  notificationId   Int?     @unique @map("notification_id")
+
+  invoice      Invoice?      @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notification Notification? @relation(fields: [notificationId], references: [id], onDelete: SetNull)
+
+  @@index([invoiceId])
+  @@map("notification_logs")
+}
+
+/// Mỗi lượt chạy scheduler; UNIQUE(job_name, run_key) đảm bảo nhiều instance không xử lý trùng một khung giờ
+model JobRun {
+  id         Int       @id @default(autoincrement())
+  jobName    String    @map("job_name")
+  runKey     String    @map("run_key")
+  status     String
+  stats      Json?
+  error      String?
+  startedAt  DateTime  @default(now()) @map("started_at")
+  finishedAt DateTime? @map("finished_at")
+
+  @@unique([jobName, runKey])
+  @@index([startedAt])
+  @@map("job_runs")
+}
+
+/// Tài khoản Hunonic (không chính thức) để đọc số kWh từ công tơ Wi-Fi. Mật khẩu & token được mã hóa AES-256-GCM.
+model HunonicAccount {
+  id          Int       @id @default(autoincrement())
+  landlordId  Int       @unique @map("landlord_id")
+  phone       String
+  passwordEnc String    @map("password_enc")
+  tokenEnc    String?   @map("token_enc")
+  autoImport  Boolean   @default(true) @map("auto_import")
+  lastSyncAt  DateTime? @map("last_sync_at")
+  lastError   String?   @map("last_error")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  landlord User @relation(fields: [landlordId], references: [id], onDelete: Cascade)
+
+  @@map("hunonic_accounts")
+}

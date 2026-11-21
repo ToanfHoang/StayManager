@@ -1,0 +1,584 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Quản Lý Phòng Trọ</title>
+<style>
+:root{
+  --bg:#f4f6f8;--card:#fff;--text:#1d2330;--muted:#6b7280;--line:#e3e7ec;
+  --primary:#2563eb;--primary-soft:#e8efff;--ok:#15803d;--ok-soft:#e5f6ea;
+  --warn:#b45309;--warn-soft:#fdf1df;--danger:#c62828;--danger-soft:#fdeaea;
+  --radius:12px;--shadow:0 1px 3px rgba(0,0,0,.06),0 1px 2px rgba(0,0,0,.04);
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#12151b;--card:#1b2029;--text:#e7eaf0;--muted:#9aa3b2;--line:#2b3240;
+  --primary:#5b8cff;--primary-soft:#1f2a44;--ok:#4ade80;--ok-soft:#173226;
+  --warn:#fbbf24;--warn-soft:#3a2e14;--danger:#f87171;--danger-soft:#3b1d1d;
+}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{position:sticky;top:0;z-index:5;background:var(--card);border-bottom:1px solid var(--line)}
+.head-in{max-width:1100px;margin:auto;padding:10px 16px;display:flex;flex-wrap:wrap;gap:8px 20px;align-items:center}
+header h1{font-size:18px;margin:0;flex:1;min-width:180px}
+nav{display:flex;gap:4px;flex-wrap:wrap}
+nav button{border:0;background:none;color:var(--muted);padding:8px 12px;border-radius:8px;font:inherit;font-weight:600;cursor:pointer}
+nav button.active{background:var(--primary-soft);color:var(--primary)}
+main{max-width:1100px;margin:auto;padding:16px}
+section{display:none}section.show{display:block}
+h2{font-size:17px;margin:0 0 12px}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:14px}
+.toolbar .spacer{flex:1}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--text);padding:7px 12px;border-radius:8px;font:inherit;font-size:14px;cursor:pointer;white-space:nowrap}
+.btn:hover{border-color:var(--primary)}
+.btn.primary{background:var(--primary);border-color:var(--primary);color:#fff}
+.btn.ok{background:var(--ok-soft);border-color:transparent;color:var(--ok)}
+.btn.danger{color:var(--danger)}
+.btn.sm{padding:4px 9px;font-size:13px}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px;margin-bottom:18px}
+.stat{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:14px}
+.stat .lbl{color:var(--muted);font-size:13px}
+.stat .val{font-size:22px;font-weight:700;margin-top:2px}
+.panel{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px;margin-bottom:16px}
+.rooms{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+.room{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:14px;display:flex;flex-direction:column;gap:6px;border-top:4px solid var(--line)}
+.room.occ{border-top-color:var(--primary)}.room.empty{border-top-color:var(--ok)}
+.room .top{display:flex;justify-content:space-between;align-items:center}
+.room .name{font-size:17px;font-weight:700}
+.room .info{color:var(--muted);font-size:13px}
+.room .info b{color:var(--text);font-weight:600}
+.room .acts{display:flex;flex-wrap:wrap;gap:6px;margin-top:auto;padding-top:8px}
+.badge{display:inline-block;padding:2px 8px;border-radius:99px;font-size:12px;font-weight:600}
+.b-ok{background:var(--ok-soft);color:var(--ok)}.b-warn{background:var(--warn-soft);color:var(--warn)}
+.b-blue{background:var(--primary-soft);color:var(--primary)}.b-red{background:var(--danger-soft);color:var(--danger)}
+.tbl-wrap{overflow-x:auto;background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow)}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{padding:9px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}
+th{color:var(--muted);font-weight:600;font-size:13px;white-space:nowrap}
+td.num,th.num{text-align:right;white-space:nowrap}
+tfoot td{font-weight:700}
+.row-acts{display:flex;gap:4px;flex-wrap:wrap}
+.list{margin:0;padding:0;list-style:none}
+.list li{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)}
+.list li:last-child{border:0}
+.muted{color:var(--muted)}
+.empty-note{color:var(--muted);text-align:center;padding:24px}
+.bars{display:flex;flex-direction:column;gap:8px}
+.bar-row{display:grid;grid-template-columns:80px 1fr 110px;gap:10px;align-items:center;font-size:13px}
+.bar{height:14px;background:var(--line);border-radius:7px;overflow:hidden;position:relative}
+.bar i{position:absolute;inset:0 auto 0 0;background:var(--primary);opacity:.35}
+.bar u{position:absolute;inset:0 auto 0 0;background:var(--primary)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px}
+.grid2 .full{grid-column:1/-1}
+label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted)}
+input,select,textarea{font:inherit;font-size:15px;color:var(--text);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:100%}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--primary);outline-offset:-1px}
+dialog{border:0;border-radius:14px;padding:0;width:min(560px,calc(100vw - 24px));background:var(--card);color:var(--text);box-shadow:0 20px 50px rgba(0,0,0,.3)}
+dialog::backdrop{background:rgba(0,0,0,.45)}
+dialog form{padding:18px;max-height:90vh;overflow:auto}
+.dlg-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
+.preview{margin-top:14px;background:var(--bg);border-radius:10px;padding:12px;font-size:14px}
+.preview div{display:flex;justify-content:space-between;gap:10px}
+.preview .total{font-weight:700;font-size:17px;border-top:1px solid var(--line);margin-top:6px;padding-top:6px}
+#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#222;color:#fff;padding:10px 16px;border-radius:8px;opacity:0;transition:.25s;pointer-events:none;z-index:50}
+#toast.show{opacity:1}
+#printArea{display:none}
+@media (max-width:560px){.grid2{grid-template-columns:1fr}.bar-row{grid-template-columns:60px 1fr 90px}}
+@media print{
+  body>*:not(#printArea){display:none!important}
+  body{background:#fff;color:#000}
+  #printArea{display:block;color:#000;font-size:14px}
+  #printArea table td,#printArea table th{border:1px solid #999;color:#000}
+}
+</style>
+</head>
+<body>
+<header><div class="head-in">
+  <h1 id="houseTitle">🏠 Nhà trọ</h1>
+  <nav>
+    <button data-tab="dashboard" class="active">Tổng quan</button>
+    <button data-tab="rooms">Phòng</button>
+    <button data-tab="bills">Hóa đơn</button>
+    <button data-tab="settings">Cài đặt</button>
+  </nav>
+</div></header>
+
+<main>
+  <section id="tab-dashboard" class="show"></section>
+  <section id="tab-rooms"></section>
+  <section id="tab-bills"></section>
+  <section id="tab-settings"></section>
+</main>
+
+<dialog id="dlg"></dialog>
+<div id="printArea"></div>
+<div id="toast"></div>
+
+<script>
+/* ================== DỮ LIỆU ================== */
+const KEY = 'phongtro_v1';
+const defaultData = () => ({
+  settings: {
+    houseName: 'Nhà trọ của tôi', owner: '', phone: '', address: '', bank: '',
+    elecPrice: 3500, waterMode: 'm3', waterPrice: 20000, waterPerPerson: 100000,
+    internet: 100000, trash: 20000, payDay: 5
+  },
+  rooms: [], bills: []
+});
+let db = load();
+function load() {
+  try {
+    const s = localStorage.getItem(KEY);
+    if (s) { const d = JSON.parse(s); const def = defaultData();
+      return { ...def, ...d, settings: { ...def.settings, ...(d.settings || {}) } }; }
+  } catch (e) { console.error(e); }
+  return defaultData();
+}
+function save() {
+  try { localStorage.setItem(KEY, JSON.stringify(db)); }
+  catch (e) { alert('Không lưu được dữ liệu: ' + e.message); }
+}
+
+/* ================== TIỆN ÍCH ================== */
+const $ = s => document.querySelector(s);
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const num = v => { const n = parseFloat(String(v ?? '').replace(/,/g, '')); return isFinite(n) ? n : 0; };
+const money = n => Math.round(+n || 0).toLocaleString('vi-VN') + ' đ';
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const today = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+const curMonth = () => today().slice(0, 7);
+const fmtMonth = m => { const [y, mo] = m.split('-'); return 'Tháng ' + (+mo) + '/' + y; };
+const fmtDate = d => d ? d.split('-').reverse().join('/') : '';
+const addMonth = (m, k) => { let [y, mo] = m.split('-').map(Number); mo += k; while (mo < 1) { mo += 12; y--; } while (mo > 12) { mo -= 12; y++; } return y + '-' + String(mo).padStart(2, '0'); };
+const room = id => db.rooms.find(r => r.id === id);
+const bill = id => db.bills.find(b => b.id === id);
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), 2200); }
+const sortRooms = arr => [...arr].sort((a, b) => a.name.localeCompare(b.name, 'vi', { numeric: true }));
+
+let state = { tab: 'dashboard', month: curMonth(), filter: 'all' };
+
+/* ================== TÍNH HÓA ĐƠN ================== */
+function calc(b) {
+  const elecUse = Math.max(0, num(b.elecNew) - num(b.elecOld));
+  const elecMoney = elecUse * num(b.elecPrice);
+  let waterUse = 0, waterMoney = 0;
+  if (b.waterMode === 'person') { waterMoney = num(b.people) * num(b.waterPrice); }
+  else { waterUse = Math.max(0, num(b.waterNew) - num(b.waterOld)); waterMoney = waterUse * num(b.waterPrice); }
+  const total = num(b.rent) + elecMoney + waterMoney + num(b.internet) + num(b.trash) + num(b.other);
+  return { elecUse, elecMoney, waterUse, waterMoney, total };
+}
+// Chỉ số cũ = chỉ số mới của hóa đơn gần nhất trước tháng này, nếu không có thì lấy chỉ số ban đầu của phòng
+function prevReadings(roomId, month) {
+  const prev = db.bills.filter(b => b.roomId === roomId && b.month < month).sort((a, b) => b.month.localeCompare(a.month))[0];
+  const r = room(roomId);
+  return prev ? { elec: num(prev.elecNew), water: num(prev.waterNew) } : { elec: num(r?.elecStart), water: num(r?.waterStart) };
+}
+
+/* ================== HỘP THOẠI ================== */
+function openDialog(title, body, onSave, opts = {}) {
+  const dlg = $('#dlg');
+  dlg.innerHTML = `<form novalidate><h2>${title}</h2>${body}
+    <div class="dlg-actions"><button type="button" class="btn" data-close>Hủy</button>
+    <button type="submit" class="btn primary">${opts.saveText || 'Lưu'}</button></div></form>`;
+  const f = dlg.querySelector('form');
+  f.onsubmit = e => {
+    e.preventDefault();
+    for (const el of f.querySelectorAll('[required]')) if (!el.value.trim()) { el.focus(); toast('Vui lòng nhập: ' + (el.closest('label')?.firstChild?.textContent || '').trim()); return; }
+    const data = Object.fromEntries(new FormData(f));
+    if (onSave(data, f) !== false) { dlg.close(); save(); render(); }
+  };
+  dlg.querySelector('[data-close]').onclick = () => dlg.close();
+  if (opts.onInput) { f.oninput = () => opts.onInput(f); opts.onInput(f); }
+  dlg.showModal();
+  const first = f.querySelector('input:not([readonly]),select,textarea'); if (first) first.focus();
+}
+const field = (label, name, val = '', type = 'text', extra = '') =>
+  `<label>${label}<input type="${type}" name="${name}" value="${esc(val)}" ${type === 'number' ? 'min="0" step="any" inputmode="decimal"' : ''} ${extra}></label>`;
+
+/* ================== TỔNG QUAN ================== */
+function renderDashboard() {
+  const s = db.settings, m = curMonth();
+  const occ = db.rooms.filter(r => r.tenant);
+  const monthBills = db.bills.filter(b => b.month === m);
+  const monthTotal = monthBills.reduce((a, b) => a + b.total, 0);
+  const monthPaid = monthBills.filter(b => b.paid).reduce((a, b) => a + b.total, 0);
+  const unpaid = db.bills.filter(b => !b.paid).sort((a, b) => a.month.localeCompare(b.month));
+  const debt = unpaid.reduce((a, b) => a + b.total, 0);
+  const noBill = sortRooms(occ).filter(r => !monthBills.some(b => b.roomId === r.id));
+  const deposits = occ.reduce((a, r) => a + num(r.tenant.deposit), 0);
+
+  const months = [...Array(6)].map((_, i) => addMonth(m, i - 5));
+  const sums = months.map(mm => { const bs = db.bills.filter(b => b.month === mm);
+    return { m: mm, total: bs.reduce((a, b) => a + b.total, 0), paid: bs.filter(b => b.paid).reduce((a, b) => a + b.total, 0) }; });
+  const max = Math.max(1, ...sums.map(x => x.total));
+
+  $('#tab-dashboard').innerHTML = `
+  ${db.rooms.length ? '' : `<div class="panel"><h2>👋 Bắt đầu</h2>
+    <ol class="muted" style="margin:0;padding-left:20px">
+      <li>Vào <b>Cài đặt</b> nhập tên nhà trọ, giá điện, giá nước, phí internet, rác.</li>
+      <li>Vào <b>Phòng</b> → <b>+ Thêm phòng</b> (nhập giá phòng và chỉ số điện/nước hiện tại).</li>
+      <li>Bấm <b>Cho thuê</b> để nhập thông tin người thuê.</li>
+      <li>Cuối tháng vào <b>Hóa đơn</b>, nhập số điện/nước mới → app tự tính tiền.</li>
+    </ol>
+    <div style="margin-top:12px"><button class="btn primary" data-act="add-room">+ Thêm phòng đầu tiên</button></div></div>`}
+  <div class="cards">
+    <div class="stat"><div class="lbl">Tổng số phòng</div><div class="val">${db.rooms.length}</div></div>
+    <div class="stat"><div class="lbl">Đang cho thuê</div><div class="val" style="color:var(--primary)">${occ.length}</div></div>
+    <div class="stat"><div class="lbl">Phòng trống</div><div class="val" style="color:var(--ok)">${db.rooms.length - occ.length}</div></div>
+    <div class="stat"><div class="lbl">Phải thu ${fmtMonth(m).toLowerCase()}</div><div class="val">${money(monthTotal)}</div></div>
+    <div class="stat"><div class="lbl">Đã thu ${fmtMonth(m).toLowerCase()}</div><div class="val" style="color:var(--ok)">${money(monthPaid)}</div></div>
+    <div class="stat"><div class="lbl">Tổng tiền còn nợ</div><div class="val" style="color:${debt ? 'var(--danger)' : 'inherit'}">${money(debt)}</div></div>
+    <div class="stat"><div class="lbl">Tiền cọc đang giữ</div><div class="val">${money(deposits)}</div></div>
+  </div>
+  <div class="panel"><h2>⚠️ Chưa đóng tiền (${unpaid.length})</h2>
+    ${unpaid.length ? `<ul class="list">${unpaid.map(b => `<li><span><b>${esc(room(b.roomId)?.name || b.roomName)}</b> · ${esc(b.tenantName)} · <span class="muted">${fmtMonth(b.month)}</span></span>
+      <span class="row-acts"><b style="color:var(--danger)">${money(b.total)}</b> <button class="btn sm ok" data-act="toggle-paid" data-id="${b.id}">✓ Đã thu</button></span></li>`).join('')}</ul>`
+      : '<div class="muted">Tất cả hóa đơn đã thu đủ 🎉</div>'}
+  </div>
+  ${occ.length ? `<div class="panel"><h2>📝 Chưa lập hóa đơn ${fmtMonth(m).toLowerCase()} (${noBill.length})</h2>
+    ${noBill.length ? `<ul class="list">${noBill.map(r => `<li><span><b>${esc(r.name)}</b> · ${esc(r.tenant.name)}</span><button class="btn sm primary" data-act="new-bill" data-id="${r.id}" data-month="${m}">Lập hóa đơn</button></li>`).join('')}</ul>`
+      : '<div class="muted">Đã lập đủ hóa đơn cho tháng này.</div>'}</div>` : ''}
+  <div class="panel"><h2>📊 Doanh thu 6 tháng gần nhất</h2><div class="bars">
+    ${sums.map(x => `<div class="bar-row"><span class="muted">${x.m.slice(5)}/${x.m.slice(0, 4)}</span>
+      <div class="bar" title="Đã thu ${money(x.paid)} / Phải thu ${money(x.total)}"><i style="width:${x.total / max * 100}%"></i><u style="width:${x.paid / max * 100}%"></u></div>
+      <span style="text-align:right">${money(x.total)}</span></div>`).join('')}
+  </div><div class="muted" style="font-size:12px;margin-top:8px">Màu đậm: đã thu · Màu nhạt: phải thu</div></div>`;
+}
+
+/* ================== PHÒNG ================== */
+function renderRooms() {
+  let list = sortRooms(db.rooms);
+  if (state.filter === 'occ') list = list.filter(r => r.tenant);
+  if (state.filter === 'empty') list = list.filter(r => !r.tenant);
+  const debtOf = id => db.bills.filter(b => b.roomId === id && !b.paid).reduce((a, b) => a + b.total, 0);
+  $('#tab-rooms').innerHTML = `
+  <div class="toolbar">
+    <button class="btn primary" data-act="add-room">+ Thêm phòng</button>
+    <span class="spacer"></span>
+    <select id="roomFilter" style="width:auto">
+      <option value="all">Tất cả phòng</option><option value="occ">Đang thuê</option><option value="empty">Phòng trống</option>
+    </select>
+  </div>
+  ${list.length ? `<div class="rooms">${list.map(r => {
+    const t = r.tenant, d = debtOf(r.id);
+    return `<div class="room ${t ? 'occ' : 'empty'}">
+      <div class="top"><span class="name">${esc(r.name)}</span>
+        ${t ? '<span class="badge b-blue">Đang thuê</span>' : '<span class="badge b-ok">Trống</span>'}</div>
+      <div class="info">Giá: <b>${money(r.price)}</b>${r.area ? ` · ${esc(r.area)} m²` : ''}</div>
+      ${t ? `<div class="info">👤 <b>${esc(t.name)}</b>${t.phone ? ` · 📞 <a href="tel:${esc(t.phone)}">${esc(t.phone)}</a>` : ''}</div>
+        <div class="info">Số người: <b>${t.people || 1}</b> · Vào ở: <b>${fmtDate(t.moveIn) || '—'}</b></div>
+        <div class="info">Tiền cọc: <b>${money(t.deposit)}</b>${t.vehicle ? ` · Xe: <b>${esc(t.vehicle)}</b>` : ''}</div>
+        ${d ? `<div><span class="badge b-red">Còn nợ ${money(d)}</span></div>` : ''}` : ''}
+      ${r.note ? `<div class="info">📌 ${esc(r.note)}</div>` : ''}
+      <div class="acts">
+        ${t ? `<button class="btn sm primary" data-act="new-bill" data-id="${r.id}" data-month="${state.month}">Lập hóa đơn</button>
+               <button class="btn sm" data-act="edit-tenant" data-id="${r.id}">Sửa khách</button>
+               <button class="btn sm" data-act="checkout" data-id="${r.id}">Trả phòng</button>`
+            : `<button class="btn sm primary" data-act="rent" data-id="${r.id}">Cho thuê</button>`}
+        <button class="btn sm" data-act="edit-room" data-id="${r.id}">Sửa phòng</button>
+        ${(r.history || []).length ? `<button class="btn sm" data-act="history" data-id="${r.id}">Lịch sử</button>` : ''}
+        ${t ? '' : `<button class="btn sm danger" data-act="del-room" data-id="${r.id}">Xóa</button>`}
+      </div></div>`; }).join('')}</div>`
+    : `<div class="panel empty-note">${db.rooms.length ? 'Không có phòng nào phù hợp.' : 'Chưa có phòng nào. Bấm “+ Thêm phòng” để bắt đầu.'}</div>`}`;
+  $('#roomFilter').value = state.filter;
+  $('#roomFilter').onchange = e => { state.filter = e.target.value; render(); };
+}
+
+function roomDialog(r) {
+  const isNew = !r; r = r || { price: '', elecStart: 0, waterStart: 0 };
+  openDialog(isNew ? 'Thêm phòng' : 'Sửa phòng ' + esc(r.name), `<div class="grid2">
+    ${field('Tên / số phòng *', 'name', r.name, 'text', 'required placeholder="VD: P101"')}
+    ${field('Giá thuê / tháng (đ) *', 'price', r.price, 'number', 'required')}
+    ${field('Diện tích (m²)', 'area', r.area, 'number')}
+    <span></span>
+    ${field('Chỉ số điện hiện tại', 'elecStart', r.elecStart, 'number')}
+    ${field('Chỉ số nước hiện tại', 'waterStart', r.waterStart, 'number')}
+    <label class="full">Ghi chú<textarea name="note" rows="2">${esc(r.note)}</textarea></label>
+    </div><p class="muted" style="font-size:12px;margin:8px 0 0">Chỉ số điện/nước hiện tại dùng làm “số cũ” cho hóa đơn đầu tiên.</p>`,
+  d => {
+    const name = d.name.trim();
+    if (db.rooms.some(x => x.name.toLowerCase() === name.toLowerCase() && x.id !== r.id)) { toast('Tên phòng đã tồn tại'); return false; }
+    const v = { name, price: num(d.price), area: d.area, elecStart: num(d.elecStart), waterStart: num(d.waterStart), note: d.note.trim() };
+    if (isNew) db.rooms.push({ id: uid(), tenant: null, history: [], ...v }); else Object.assign(r, v);
+    toast(isNew ? 'Đã thêm phòng ' + name : 'Đã lưu');
+  });
+}
+
+function tenantDialog(r) {
+  const isNew = !r.tenant; const t = r.tenant || { moveIn: today(), people: 1, deposit: r.price };
+  openDialog((isNew ? 'Cho thuê phòng ' : 'Thông tin khách phòng ') + esc(r.name), `<div class="grid2">
+    ${field('Họ tên người thuê *', 'name', t.name, 'text', 'required')}
+    ${field('Số điện thoại', 'phone', t.phone, 'tel')}
+    ${field('Số CCCD', 'idCard', t.idCard)}
+    ${field('Quê quán / địa chỉ', 'hometown', t.hometown)}
+    ${field('Ngày vào ở', 'moveIn', t.moveIn, 'date')}
+    ${field('Số người ở', 'people', t.people, 'number')}
+    ${field('Tiền cọc (đ)', 'deposit', t.deposit, 'number')}
+    ${field('Biển số xe', 'vehicle', t.vehicle)}
+    <label class="full">Ghi chú (người ở cùng, hợp đồng...)<textarea name="note" rows="2">${esc(t.note)}</textarea></label>
+    </div>`,
+  d => {
+    r.tenant = { name: d.name.trim(), phone: d.phone.trim(), idCard: d.idCard.trim(), hometown: d.hometown.trim(), moveIn: d.moveIn,
+      people: Math.max(1, num(d.people) || 1), deposit: num(d.deposit), vehicle: d.vehicle.trim(), note: d.note.trim() };
+    toast(isNew ? 'Đã cho thuê ' + r.name : 'Đã lưu');
+  }, { saveText: isNew ? 'Cho thuê' : 'Lưu' });
+}
+
+function checkoutDialog(r) {
+  const debt = db.bills.filter(b => b.roomId === r.id && !b.paid).reduce((a, b) => a + b.total, 0);
+  openDialog('Trả phòng ' + esc(r.name), `
+    <p>Khách: <b>${esc(r.tenant.name)}</b> · Tiền cọc: <b>${money(r.tenant.deposit)}</b></p>
+    ${debt ? `<p style="color:var(--danger)">⚠️ Phòng này còn nợ <b>${money(debt)}</b> chưa thu.</p>` : ''}
+    <div class="grid2">${field('Ngày trả phòng', 'moveOut', today(), 'date')}
+    ${field('Tiền cọc hoàn lại (đ)', 'refund', Math.max(0, num(r.tenant.deposit) - debt), 'number')}</div>
+    <p class="muted" style="font-size:13px">Nhớ lập hóa đơn tháng cuối trước khi trả phòng. Thông tin khách sẽ được lưu vào lịch sử phòng.</p>`,
+  d => {
+    r.history = r.history || [];
+    r.history.unshift({ ...r.tenant, moveOut: d.moveOut, refund: num(d.refund) });
+    r.tenant = null; toast('Đã trả phòng ' + r.name);
+  }, { saveText: 'Xác nhận trả phòng' });
+}
+
+function historyDialog(r) {
+  openDialog('Lịch sử thuê phòng ' + esc(r.name), `<ul class="list">${(r.history || []).map(h => `<li><span><b>${esc(h.name)}</b> ${h.phone ? '· ' + esc(h.phone) : ''}<br>
+    <span class="muted" style="font-size:13px">${fmtDate(h.moveIn) || '?'} → ${fmtDate(h.moveOut)} · Cọc ${money(h.deposit)} · Hoàn ${money(h.refund)}</span></span></li>`).join('')}</ul>`,
+    () => {}, { saveText: 'Đóng' });
+}
+
+/* ================== HÓA ĐƠN ================== */
+function renderBills() {
+  const m = state.month;
+  const bills = db.bills.filter(b => b.month === m);
+  const ids = new Set([...db.rooms.filter(r => r.tenant).map(r => r.id), ...bills.map(b => b.roomId)]);
+  const rows = sortRooms(db.rooms.filter(r => ids.has(r.id)));
+  const orphan = bills.filter(b => !room(b.roomId));
+  const total = bills.reduce((a, b) => a + b.total, 0), paid = bills.filter(b => b.paid).reduce((a, b) => a + b.total, 0);
+  const water = db.settings.waterMode === 'person';
+
+  const rowHtml = (r, b) => {
+    if (!b) return `<tr><td><b>${esc(r.name)}</b></td><td>${esc(r.tenant?.name || '')}</td><td colspan="3" class="muted">Chưa lập hóa đơn</td>
+      <td></td><td><button class="btn sm primary" data-act="new-bill" data-id="${r.id}" data-month="${m}">Lập hóa đơn</button></td></tr>`;
+    const c = calc(b);
+    return `<tr><td><b>${esc(r?.name || b.roomName)}</b></td><td>${esc(b.tenantName)}</td>
+      <td class="num">${c.elecUse} kWh<br><span class="muted">${money(c.elecMoney)}</span></td>
+      <td class="num">${b.waterMode === 'person' ? b.people + ' người' : c.waterUse + ' m³'}<br><span class="muted">${money(c.waterMoney)}</span></td>
+      <td class="num"><b>${money(b.total)}</b></td>
+      <td>${b.paid ? `<span class="badge b-ok">Đã thu</span><div class="muted" style="font-size:12px">${fmtDate(b.paidDate)}</div>` : '<span class="badge b-warn">Chưa thu</span>'}</td>
+      <td><div class="row-acts">
+        <button class="btn sm ${b.paid ? '' : 'ok'}" data-act="toggle-paid" data-id="${b.id}">${b.paid ? 'Bỏ đã thu' : '✓ Đã thu'}</button>
+        <button class="btn sm" data-act="edit-bill" data-id="${b.id}">Sửa</button>
+        <button class="btn sm" data-act="copy-bill" data-id="${b.id}" title="Sao chép để gửi Zalo/tin nhắn">Sao chép</button>
+        <button class="btn sm" data-act="print-bill" data-id="${b.id}">In</button>
+        <button class="btn sm danger" data-act="del-bill" data-id="${b.id}">Xóa</button>
+      </div></td></tr>`;
+  };
+
+  $('#tab-bills').innerHTML = `
+  <div class="toolbar">
+    <button class="btn" data-act="month" data-k="-1">◀</button>
+    <input type="month" id="billMonth" value="${m}" style="width:auto">
+    <button class="btn" data-act="month" data-k="1">▶</button>
+    <span class="spacer"></span>
+    <span class="muted">Phải thu: <b style="color:var(--text)">${money(total)}</b> · Đã thu: <b style="color:var(--ok)">${money(paid)}</b> · Còn: <b style="color:var(--danger)">${money(total - paid)}</b></span>
+  </div>
+  ${rows.length || orphan.length ? `<div class="tbl-wrap"><table>
+    <thead><tr><th>Phòng</th><th>Khách</th><th class="num">Điện</th><th class="num">Nước</th><th class="num">Tổng</th><th>Trạng thái</th><th></th></tr></thead>
+    <tbody>${rows.map(r => rowHtml(r, bills.find(b => b.roomId === r.id))).join('')}${orphan.map(b => rowHtml(null, b)).join('')}</tbody>
+  </table></div>` : `<div class="panel empty-note">Chưa có phòng nào đang cho thuê.</div>`}`;
+  $('#billMonth').onchange = e => { if (e.target.value) { state.month = e.target.value; render(); } };
+}
+
+function billDialog(roomId, month, existing) {
+  const s = db.settings, r = room(roomId);
+  if (!existing) {
+    const dup = db.bills.find(b => b.roomId === roomId && b.month === month);
+    if (dup) existing = dup;
+  }
+  let b;
+  if (existing) b = existing;
+  else {
+    const p = prevReadings(roomId, month);
+    b = { roomId, month, rent: r.price, elecOld: p.elec, elecNew: '', elecPrice: s.elecPrice,
+      waterMode: s.waterMode, waterOld: p.water, waterNew: '', waterPrice: s.waterMode === 'person' ? s.waterPerPerson : s.waterPrice,
+      people: r.tenant?.people || 1, internet: s.internet, trash: s.trash, other: 0, otherNote: '', note: '' };
+  }
+  const person = b.waterMode === 'person';
+  openDialog(`${existing ? 'Sửa' : 'Lập'} hóa đơn ${esc(r?.name || b.roomName)} – ${fmtMonth(month)}`, `<div class="grid2">
+    ${field('Tiền phòng (đ)', 'rent', b.rent, 'number')}
+    ${field('Đơn giá điện (đ/kWh)', 'elecPrice', b.elecPrice, 'number')}
+    ${field('Số điện cũ', 'elecOld', b.elecOld, 'number')}
+    ${field('Số điện mới *', 'elecNew', b.elecNew, 'number', 'required')}
+    ${person ? `${field('Số người', 'people', b.people, 'number')}${field('Tiền nước / người (đ)', 'waterPrice', b.waterPrice, 'number')}`
+      : `${field('Số nước cũ', 'waterOld', b.waterOld, 'number')}${field('Số nước mới *', 'waterNew', b.waterNew, 'number', 'required')}
+         ${field('Đơn giá nước (đ/m³)', 'waterPrice', b.waterPrice, 'number')}<span></span>`}
+    ${field('Internet / wifi (đ)', 'internet', b.internet, 'number')}
+    ${field('Tiền rác / vệ sinh (đ)', 'trash', b.trash, 'number')}
+    ${field('Phí khác (đ)', 'other', b.other, 'number')}
+    ${field('Nội dung phí khác', 'otherNote', b.otherNote, 'text', 'placeholder="VD: gửi xe, sửa vòi nước..."')}
+    <label class="full">Ghi chú<input name="note" value="${esc(b.note)}"></label>
+  </div><div class="preview" id="pv"></div>`,
+  d => {
+    const nb = formToBill(d, b);
+    if (num(d.elecNew) < num(d.elecOld)) { toast('Số điện mới phải ≥ số điện cũ'); return false; }
+    if (!person && num(d.waterNew) < num(d.waterOld)) { toast('Số nước mới phải ≥ số nước cũ'); return false; }
+    if (existing) Object.assign(existing, nb);
+    else db.bills.push({ id: uid(), paid: false, paidDate: '', tenantName: r.tenant?.name || '', roomName: r.name, ...nb });
+    toast('Đã lưu hóa đơn');
+  }, { onInput: f => {
+    const c = calc(formToBill(Object.fromEntries(new FormData(f)), b));
+    f.querySelector('#pv').innerHTML = `
+      <div><span>Tiền phòng</span><span>${money(f.rent.value)}</span></div>
+      <div><span>Điện: ${c.elecUse} kWh</span><span>${money(c.elecMoney)}</span></div>
+      <div><span>Nước${person ? '' : ': ' + c.waterUse + ' m³'}</span><span>${money(c.waterMoney)}</span></div>
+      <div><span>Internet + rác + khác</span><span>${money(num(f.internet.value) + num(f.trash.value) + num(f.other.value))}</span></div>
+      <div class="total"><span>TỔNG CỘNG</span><span>${money(c.total)}</span></div>`;
+  }});
+}
+function formToBill(d, base) {
+  const nb = { roomId: base.roomId, month: base.month, waterMode: base.waterMode,
+    rent: num(d.rent), elecOld: num(d.elecOld), elecNew: num(d.elecNew), elecPrice: num(d.elecPrice),
+    waterOld: num(d.waterOld ?? base.waterOld), waterNew: num(d.waterNew ?? base.waterNew), waterPrice: num(d.waterPrice),
+    people: num(d.people ?? base.people), internet: num(d.internet), trash: num(d.trash), other: num(d.other),
+    otherNote: (d.otherNote || '').trim(), note: (d.note || '').trim() };
+  nb.total = calc(nb).total; return nb;
+}
+
+function billText(b) {
+  const s = db.settings, c = calc(b), r = room(b.roomId);
+  const L = [`${s.houseName} – HÓA ĐƠN ${fmtMonth(b.month).toUpperCase()}`, `Phòng: ${r?.name || b.roomName} – ${b.tenantName}`, '',
+    `• Tiền phòng: ${money(b.rent)}`,
+    `• Điện: ${b.elecOld} → ${b.elecNew} = ${c.elecUse} kWh × ${money(b.elecPrice)} = ${money(c.elecMoney)}`,
+    b.waterMode === 'person' ? `• Nước: ${b.people} người × ${money(b.waterPrice)} = ${money(c.waterMoney)}`
+      : `• Nước: ${b.waterOld} → ${b.waterNew} = ${c.waterUse} m³ × ${money(b.waterPrice)} = ${money(c.waterMoney)}`];
+  if (b.internet) L.push(`• Internet: ${money(b.internet)}`);
+  if (b.trash) L.push(`• Rác/vệ sinh: ${money(b.trash)}`);
+  if (b.other) L.push(`• ${b.otherNote || 'Phí khác'}: ${money(b.other)}`);
+  L.push('', `TỔNG CỘNG: ${money(b.total)}`);
+  if (b.note) L.push('Ghi chú: ' + b.note);
+  if (s.payDay) L.push(`Vui lòng thanh toán trước ngày ${s.payDay} hàng tháng.`);
+  if (s.bank) L.push('Chuyển khoản: ' + s.bank);
+  if (s.phone) L.push('Liên hệ: ' + (s.owner ? s.owner + ' – ' : '') + s.phone);
+  return L.join('\n');
+}
+async function copyText(t) {
+  try { await navigator.clipboard.writeText(t); }
+  catch { const ta = document.createElement('textarea'); ta.value = t; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); }
+  toast('Đã sao chép – dán vào Zalo/tin nhắn để gửi khách');
+}
+function printBill(b) {
+  const s = db.settings, c = calc(b), r = room(b.roomId);
+  const row = (a, x, y = '') => `<tr><td>${a}</td><td>${y}</td><td style="text-align:right">${money(x)}</td></tr>`;
+  $('#printArea').innerHTML = `<div style="max-width:620px;margin:auto;font-family:system-ui,sans-serif">
+    <h2 style="text-align:center;margin:0">${esc(s.houseName)}</h2>
+    <div style="text-align:center;font-size:13px">${esc(s.address)}${s.phone ? ' · ĐT: ' + esc(s.phone) : ''}</div>
+    <h3 style="text-align:center;margin:16px 0 4px">HÓA ĐƠN TIỀN PHÒNG ${fmtMonth(b.month).toUpperCase()}</h3>
+    <p>Phòng: <b>${esc(r?.name || b.roomName)}</b> &nbsp;·&nbsp; Người thuê: <b>${esc(b.tenantName)}</b></p>
+    <table style="width:100%;border-collapse:collapse"><thead><tr><th>Khoản</th><th>Chi tiết</th><th style="text-align:right">Thành tiền</th></tr></thead><tbody>
+    ${row('Tiền phòng', b.rent)}
+    ${row('Tiền điện', c.elecMoney, `${b.elecOld} → ${b.elecNew} = ${c.elecUse} kWh × ${money(b.elecPrice)}`)}
+    ${row('Tiền nước', c.waterMoney, b.waterMode === 'person' ? `${b.people} người × ${money(b.waterPrice)}` : `${b.waterOld} → ${b.waterNew} = ${c.waterUse} m³ × ${money(b.waterPrice)}`)}
+    ${b.internet ? row('Internet', b.internet) : ''}${b.trash ? row('Rác / vệ sinh', b.trash) : ''}${b.other ? row(esc(b.otherNote || 'Phí khác'), b.other) : ''}
+    <tr><td colspan="2"><b>TỔNG CỘNG</b></td><td style="text-align:right"><b>${money(b.total)}</b></td></tr></tbody></table>
+    ${b.note ? `<p>Ghi chú: ${esc(b.note)}</p>` : ''}
+    ${s.bank ? `<p>Chuyển khoản: <b>${esc(s.bank)}</b></p>` : ''}
+    <p>Trạng thái: <b>${b.paid ? 'ĐÃ THANH TOÁN ' + fmtDate(b.paidDate) : 'CHƯA THANH TOÁN'}</b></p>
+    <table style="width:100%;margin-top:30px;border:0"><tr><td style="border:0;text-align:center">Người thuê<br><br><br><br></td>
+    <td style="border:0;text-align:center">Chủ nhà<br><br><br><br>${esc(s.owner)}</td></tr></table></div>`;
+  window.print();
+}
+
+/* ================== CÀI ĐẶT ================== */
+function renderSettings() {
+  const s = db.settings;
+  $('#tab-settings').innerHTML = `
+  <form class="panel" id="setForm"><h2>Thông tin nhà trọ & đơn giá mặc định</h2><div class="grid2">
+    ${field('Tên nhà trọ', 'houseName', s.houseName)}
+    ${field('Tên chủ nhà', 'owner', s.owner)}
+    ${field('Số điện thoại', 'phone', s.phone, 'tel')}
+    ${field('Địa chỉ', 'address', s.address)}
+    <label class="full">Thông tin chuyển khoản (in trên hóa đơn)<input name="bank" value="${esc(s.bank)}" placeholder="VD: Vietcombank 0123456789 – NGUYEN VAN A"></label>
+    ${field('Giá điện (đ/kWh)', 'elecPrice', s.elecPrice, 'number')}
+    <label>Cách tính tiền nước<select name="waterMode">
+      <option value="m3" ${s.waterMode === 'm3' ? 'selected' : ''}>Theo đồng hồ (m³)</option>
+      <option value="person" ${s.waterMode === 'person' ? 'selected' : ''}>Theo đầu người</option></select></label>
+    ${field('Giá nước (đ/m³)', 'waterPrice', s.waterPrice, 'number')}
+    ${field('Giá nước theo người (đ/người)', 'waterPerPerson', s.waterPerPerson, 'number')}
+    ${field('Internet / wifi (đ/phòng)', 'internet', s.internet, 'number')}
+    ${field('Rác / vệ sinh (đ/phòng)', 'trash', s.trash, 'number')}
+    ${field('Hạn đóng tiền (ngày trong tháng)', 'payDay', s.payDay, 'number')}
+  </div>
+  <p class="muted" style="font-size:12px">Đơn giá mới chỉ áp dụng cho hóa đơn lập sau khi lưu; hóa đơn cũ giữ nguyên.</p>
+  <button class="btn primary">Lưu cài đặt</button></form>
+
+  <div class="panel"><h2>💾 Sao lưu dữ liệu</h2>
+    <p class="muted" style="margin-top:0">Dữ liệu được lưu trong trình duyệt trên máy này. Nên <b>xuất file sao lưu</b> thường xuyên (ví dụ mỗi tháng) và cất vào USB / Google Drive / Zalo để không bị mất khi xóa lịch sử trình duyệt hoặc đổi máy.</p>
+    <div class="toolbar"><button class="btn primary" data-act="export">⬇ Xuất file sao lưu</button>
+      <button class="btn" data-act="import">⬆ Nhập từ file sao lưu</button>
+      <input type="file" id="importFile" accept=".json,application/json" hidden>
+      <span class="spacer"></span><button class="btn danger" data-act="reset">Xóa toàn bộ dữ liệu</button></div>
+  </div>`;
+  $('#setForm').onsubmit = e => {
+    e.preventDefault(); const d = Object.fromEntries(new FormData(e.target));
+    for (const k of ['elecPrice', 'waterPrice', 'waterPerPerson', 'internet', 'trash', 'payDay']) d[k] = num(d[k]);
+    Object.assign(db.settings, d); save(); render(); toast('Đã lưu cài đặt');
+  };
+  $('#importFile').onchange = e => {
+    const f = e.target.files[0]; if (!f) return;
+    const rd = new FileReader();
+    rd.onload = () => {
+      try {
+        const d = JSON.parse(rd.result);
+        if (!Array.isArray(d.rooms) || !Array.isArray(d.bills)) throw new Error('File không đúng định dạng');
+        if (!confirm(`File có ${d.rooms.length} phòng, ${d.bills.length} hóa đơn.\nDữ liệu hiện tại sẽ bị THAY THẾ. Tiếp tục?`)) return;
+        db = { ...defaultData(), ...d, settings: { ...defaultData().settings, ...(d.settings || {}) } };
+        save(); render(); toast('Đã nhập dữ liệu');
+      } catch (err) { alert('Không đọc được file: ' + err.message); }
+    };
+    rd.readAsText(f); e.target.value = '';
+  };
+}
+
+/* ================== ĐIỀU HƯỚNG & SỰ KIỆN ================== */
+function render() {
+  $('#houseTitle').textContent = '🏠 ' + (db.settings.houseName || 'Nhà trọ');
+  document.querySelectorAll('nav button').forEach(b => b.classList.toggle('active', b.dataset.tab === state.tab));
+  document.querySelectorAll('main section').forEach(s => s.classList.toggle('show', s.id === 'tab-' + state.tab));
+  ({ dashboard: renderDashboard, rooms: renderRooms, bills: renderBills, settings: renderSettings })[state.tab]();
+}
+document.querySelector('nav').onclick = e => { const t = e.target.closest('[data-tab]'); if (t) { state.tab = t.dataset.tab; render(); scrollTo(0, 0); } };
+
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-act]'); if (!el) return;
+  const id = el.dataset.id, act = el.dataset.act;
+  switch (act) {
+    case 'add-room': roomDialog(); break;
+    case 'edit-room': roomDialog(room(id)); break;
+    case 'del-room': {
+      const r = room(id), n = db.bills.filter(b => b.roomId === id).length;
+      if (confirm(`Xóa phòng ${r.name}?${n ? `\n(${n} hóa đơn cũ của phòng vẫn được giữ lại)` : ''}`)) { db.rooms = db.rooms.filter(x => x.id !== id); save(); render(); }
+      break; }
+    case 'rent': case 'edit-tenant': tenantDialog(room(id)); break;
+    case 'checkout': checkoutDialog(room(id)); break;
+    case 'history': historyDialog(room(id)); break;
+    case 'new-bill': billDialog(id, el.dataset.month || state.month); break;
+    case 'edit-bill': { const b = bill(id); billDialog(b.roomId, b.month, b); break; }
+    case 'del-bill': { const b = bill(id); if (confirm(`Xóa hóa đơn ${room(b.roomId)?.name || b.roomName} – ${fmtMonth(b.month)}?`)) { db.bills = db.bills.filter(x => x.id !== id); save(); render(); } break; }
+    case 'toggle-paid': { const b = bill(id); b.paid = !b.paid; b.paidDate = b.paid ? today() : ''; save(); render(); toast(b.paid ? 'Đã đánh dấu đã thu ' + money(b.total) : 'Đã bỏ đánh dấu'); break; }
+    case 'copy-bill': copyText(billText(bill(id))); break;
+    case 'print-bill': printBill(bill(id)); break;
+    case 'month': state.month = addMonth(state.month, +el.dataset.k); render(); break;
+    case 'export': {
+      const blob = new Blob([JSON.stringify(db, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `phongtro-saoluu-${today()}.json`; a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000); toast('Đã xuất file sao lưu'); break; }
+    case 'import': $('#importFile').click(); break;
+    case 'reset':
+      if (confirm('Xóa TOÀN BỘ phòng, khách và hóa đơn? Không thể hoàn tác!') && confirm('Bạn chắc chắn chứ? Hãy xuất file sao lưu trước nếu cần.')) { db = defaultData(); save(); render(); toast('Đã xóa toàn bộ dữ liệu'); }
+      break;
+  }
+});
+
+render();
+</script>
+</body>
+</html>
